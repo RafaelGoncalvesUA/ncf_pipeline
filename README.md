@@ -35,6 +35,18 @@ W1
 
 ----------
 ### Refs
+https://medium.com/@maxbrenner-ai/matrix-factorization-for-collaborative-filtering-linear-to-non-linear-models-in-python-5cf54363a03c
+https://github.com/maxbrenner-ai/matrix-factorization-for-collaborative-filtering/blob/master/matrix_factorization.ipynb
+
+https://pytorch.org/tutorials/beginner/saving_loading_models.html
+
+https://github.com/noveens/svae_cf/blob/master/main_svae.ipynb
+
+
+
+
+
+------------
 https://induraj2020.medium.com/recommendation-system-using-pyspark-kafka-and-spark-streaming-3eb36b3c3df0
 
 Create a view: https://medium.com/conduktor/getting-started-with-pyspark-kafka-sql-and-ai-e1ac39c8e893

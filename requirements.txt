@@ -1,4 +1,5 @@
-tensorflow==2.15.0
+torch
 kafka
 kafka-python
 pyspark
+pandas
