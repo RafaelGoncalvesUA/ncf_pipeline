@@ -3,3 +3,4 @@ kafka
 kafka-python
 pyspark
 pandas
+wandb
