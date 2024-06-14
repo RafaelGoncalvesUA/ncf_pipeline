@@ -8,6 +8,7 @@ import wandb
 
 
 wandb.login(key='a6beca469e4665eb0bc333c6a761f5503f5554d4', relogin=True)
+
 wandb.init(
     project='caa-proj2', 
     config={
