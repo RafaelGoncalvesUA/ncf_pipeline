@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -5,6 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, random_split
 from tqdm import tqdm
+import ray
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
 
 ratings = pd.read_csv('data/ml-1m/ratings.csv')
 
@@ -67,17 +72,6 @@ class NonLinearModel(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-embedding_dim = 50
-dropout = 0.1
-
-learning_rate = 1e-3
-
-num_epochs = 10
-
-model = NonLinearModel(num_users, num_items, embedding_dim, dropout).to(device)
-
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-6):
         super().__init__()
@@ -114,22 +108,57 @@ def evaluate(model, dataloader, criterion, device):
             eval_loss += loss.item()
     return eval_loss / len(dataloader)
 
-for epoch in range(num_epochs):
-    train_loss = train(model, train_loader, optimizer, criterion, device)
-    eval_loss = evaluate(model, test_loader, criterion, device)
-    print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
+def tune_nonlinear(config):
+    model = NonLinearModel(num_users, num_items, config['embedding_dim'], config['dropout']).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
 
-def predict(model, user_id, item_id, device):
-    model.eval()
-    with torch.no_grad():
-        user_tensor = torch.tensor([user_id]).to(device)
-        item_tensor = torch.tensor([item_id]).to(device)
-        rating = model(user_tensor, item_tensor)
-        return rating.item()
+    best_eval_loss = np.inf
+    best_epoch = 0
     
-K = 10
-for i in range(K):
-    idx = np.random.randint(len(test_dataset))
-    user, item, rating = test_dataset[idx]
-    prediction = predict(model, user, item, device)
-    print(f"User: {user}, Item: {item}, True Rating: {rating}, Predicted Rating: {prediction:.2f}")
+    for epoch in range(config['num_epochs']):
+        train_loss = train(model, train_loader, optimizer, criterion, device)
+        eval_loss = evaluate(model, test_loader, criterion, device)
+
+        if eval_loss < best_eval_loss:
+            best_eval_loss = eval_loss
+            best_epoch = epoch
+        
+        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss, best_eval_loss=best_eval_loss, best_epoch=best_epoch))
+
+search_space = {
+    "embedding_dim": tune.choice([32, 64, 128, 256, 512, 1024]),
+    "dropout": tune.choice([0.0] * 3 + [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]),
+    "learning_rate": tune.loguniform(1e-4, 1e-2),
+    "num_epochs": 10,
+}
+
+reporter = CLIReporter(
+    parameter_columns=["embedding_dim", "learning_rate", "dropout"],
+    metric_columns=["train_loss", "eval_loss", "best_eval_loss", "best_epoch"]
+)
+
+scheduler = ASHAScheduler(
+    metric="eval_loss",
+    mode="min",
+    max_t=10,
+    grace_period=1,
+    reduction_factor=2
+)
+
+def trial_dirname_creator(trial):
+    return f"trial_{trial.trial_id}"
+
+storage_path = os.path.abspath("./non-linear/ray_results")
+
+analysis = tune.run(
+    tune_nonlinear,
+    config=search_space,
+    num_samples=100,
+    scheduler=scheduler,
+    progress_reporter=reporter,
+    storage_path=storage_path,
+    trial_dirname_creator=trial_dirname_creator,
+)
+
+df = analysis.results_df
+df.to_csv("non-linear/ray_tune_results.csv", index=False)

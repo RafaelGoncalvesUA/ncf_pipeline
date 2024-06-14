@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -6,6 +7,10 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn.functional as F
 from tqdm import tqdm
+import ray
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
 
 ratings = pd.read_csv('data/ml-1m/ratings.csv')
 user_ids = ratings['userId'].unique()
@@ -69,20 +74,8 @@ class AE(nn.Module):
         encoded = self.encoder(combined_vec)
         decoded = self.decoder(encoded)
         return decoded.squeeze()
-    
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-latent_dim = 20
-hidden_dim = 64
-dropout = 0.1
-
-learning_rate = 1e-3
-
-num_epochs = 10
-
-model = AE(num_users, num_items, hidden_dim, latent_dim, dropout).to(device)
-
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-6):
@@ -120,22 +113,51 @@ def evaluate(model, dataloader, criterion, device):
             eval_loss += loss.item()
     return eval_loss / len(dataloader)
 
-for epoch in range(num_epochs):
-    train_loss = train(model, train_loader, optimizer, criterion, device)
-    eval_loss = evaluate(model, test_loader, criterion, device)
-    print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
-
-def predict(model, user_id, item_id, device):
-    model.eval()
-    with torch.no_grad():
-        user_tensor = torch.tensor([user_id]).to(device)
-        item_tensor = torch.tensor([item_id]).to(device)
-        rating = model(user_tensor, item_tensor)
-        return rating.item()
+def tune_ae(config):
+    model = AE(num_users, num_items, config['hidden_dim'], config['latent_dim'], config['dropout']).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
     
-K = 10
-for i in range(K):
-    idx = np.random.randint(len(test_dataset))
-    user, item, rating = test_dataset[idx]
-    prediction = predict(model, user, item, device)
-    print(f"User: {user}, Item: {item}, True Rating: {rating}, Predicted Rating: {prediction:.2f}")
+    for epoch in range(config['num_epochs']):
+        train_loss = train(model, train_loader, optimizer, criterion, device)
+        eval_loss = evaluate(model, test_loader, criterion, device)
+        
+        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss))
+
+search_space = {
+    "hidden_dim": tune.choice([32, 64, 128, 256, 512, 1024]),
+    "latent_dim": tune.choice([8, 16, 32, 64, 128, 256]),
+    "dropout": tune.choice([0.0] * 3 + [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]),
+    "learning_rate": tune.loguniform(1e-4, 1e-2),
+    "num_epochs": 10
+}
+
+reporter = CLIReporter(
+    parameter_columns=["hidden_dim", "latent_dim", "learning_rate", "dropout"],
+    metric_columns=["train_loss", "eval_loss"]
+)
+
+scheduler = ASHAScheduler(
+    metric="eval_loss",
+    mode="min",
+    max_t=10,
+    grace_period=1,
+    reduction_factor=2
+)
+
+def trial_dirname_creator(trial):
+    return f"trial_{trial.trial_id}"
+
+storage_path = os.path.abspath("./ae/ray_results")
+
+analysis = tune.run(
+    tune_ae,
+    config=search_space,
+    num_samples=100,
+    scheduler=scheduler,
+    progress_reporter=reporter,
+    storage_path=storage_path,
+    trial_dirname_creator=trial_dirname_creator,
+)
+
+df = analysis.results_df
+df.to_csv("ae/ray_tune_results.csv", index=False)
