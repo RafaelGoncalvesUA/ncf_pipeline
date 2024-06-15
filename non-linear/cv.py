@@ -1,15 +1,27 @@
 import os
 import pandas as pd
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import Dataset
+from sklearn.model_selection import KFold
+from time import process_time
 from tqdm import tqdm
-import ray
-from ray import tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
+
+ray_results = pd.read_csv('non-linear/ray_results/ray_tune_results.csv').sort_values('eval_loss', ascending=True)
+
+idx = 0
+
+print(ray_results)
+
+best_config = ray_results.iloc[idx]
+
+print(best_config)
+
+embedding_dim = best_config['config/embedding_dim']
+dropout = best_config['config/dropout']
+learning_rate = best_config['config/learning_rate']
+num_epochs = best_config['config/num_epochs']
 
 ratings = pd.read_csv('data/ml-1m/ratings.csv')
 
@@ -39,13 +51,7 @@ class MovieLensDataset(Dataset):
 
 dataset = MovieLensDataset(ratings)
 
-train_size = int(0.9 * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-
 batch_size = 1024
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 class NonLinearModel(nn.Module):
     def __init__(self, num_users, num_items, embedding_dim, dropout):
@@ -108,50 +114,68 @@ def evaluate(model, dataloader, criterion, device):
             eval_loss += loss.item()
     return eval_loss / len(dataloader)
 
-def tune_nonlinear(config):
-    model = NonLinearModel(num_users, num_items, config['embedding_dim'], config['dropout']).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
+K = 5
 
-    for _ in range(config['num_epochs']):
+kfold = KFold(n_splits=K, shuffle=True, random_state=42)
+
+train_losses = []
+eval_losses = []
+times = []
+
+for fold, (train_idx, eval_idx) in enumerate(kfold.split(dataset)):
+    print(f"Fold {fold + 1}")
+
+    gtime = process_time()
+
+    fold_train_losses = []
+    fold_eval_losses = []
+    
+    train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
+    eval_subsampler = torch.utils.data.SubsetRandomSampler(eval_idx)
+    
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=train_subsampler)
+    eval_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=eval_subsampler)
+    
+    model = NonLinearModel(num_users, num_items, embedding_dim, dropout).to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    for epoch in range(num_epochs):
         train_loss = train(model, train_loader, optimizer, criterion, device)
-        eval_loss = evaluate(model, test_loader, criterion, device)
-        
-        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss))
+        eval_loss = evaluate(model, eval_loader, criterion, device)
 
-search_space = {
-    "embedding_dim": tune.choice([32, 64, 128, 256, 512, 1024]),
-    "dropout": tune.choice([0.0] * 3 + [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]),
-    "learning_rate": tune.loguniform(1e-4, 1e-2),
-    "num_epochs": 10,
-}
+        fold_train_losses.append(train_loss)
+        fold_eval_losses.append(eval_loss)
 
-reporter = CLIReporter(
-    parameter_columns=["embedding_dim", "learning_rate", "dropout"],
-    metric_columns=["train_loss", "eval_loss"]
-)
+        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
+    
+    train_losses.append(fold_train_losses)
+    eval_losses.append(fold_eval_losses)
 
-scheduler = ASHAScheduler(
-    metric="eval_loss",
-    mode="min",
-    max_t=10,
-    grace_period=1,
-    reduction_factor=2
-)
+    times.append(process_time() - gtime)
 
-def trial_dirname_creator(trial):
-    return f"trial_{trial.trial_id}"
+results = []
 
-storage_path = os.path.abspath("./non-linear/ray_results")
+for fold, (train_losses_fold, eval_losses_fold, time) in enumerate(zip(train_losses, eval_losses, times)):
+    for epoch, (train_loss, eval_loss) in enumerate(zip(train_losses_fold, eval_losses_fold)):
+        results.append({
+            'config/embedding_dim': embedding_dim,
+            'config/dropout': dropout,
+            'config/learning_rate': learning_rate,
+            'config/num_epochs': num_epochs,
+            'fold': fold,
+            'epoch': epoch,
+            'train_loss': train_loss,
+            'eval_loss': eval_loss,
+            'elapsed_time': time,
+            'num_users': num_users,
+            'num_items': num_items,
+            'num_ratings': len(ratings)
+        })
 
-analysis = tune.run(
-    tune_nonlinear,
-    config=search_space,
-    num_samples=100,
-    scheduler=scheduler,
-    progress_reporter=reporter,
-    storage_path=storage_path,
-    trial_dirname_creator=trial_dirname_creator,
-)
+results_df = pd.DataFrame(results)
 
-df = analysis.results_df
-df.to_csv("non-linear/ray_tune_results.csv", index=False)
+os.makedirs('non-linear/cv_results', exist_ok=True)
+
+results_df.to_csv(f'non-linear/cv_results/{idx}.csv', index=False)
+

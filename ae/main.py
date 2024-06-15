@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 ratings = pd.read_csv('data/ml-1m/ratings.csv')
+
 user_ids = ratings['userId'].unique()
 item_ids = ratings['movieId'].unique()
 
