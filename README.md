@@ -1,3 +1,8 @@
+https://arxiv.org/pdf/1312.6211
+We find that in most cases, dropout increases the opti- mal size of the net, so the resistance to forgetting may be explained mostly by the larger nets having greater capacity. However, this effect is not consistent, and when using dissimilar task pairs, dropout usually de- creases the size of the net.
+
+
+
 Dataset: MovieLens
 Kubeflow pipeline tutorial: <https://www.youtube.com/watch?v=6wWdNg0GMV4&t=2642s>
 
@@ -35,6 +40,12 @@ W1
 
 ----------
 ### Refs
+usar mse
+e métricas de retrieval tbm
+
+Continual Collaborative Filtering Through Gradient Alignment
+
+
 https://medium.com/@maxbrenner-ai/matrix-factorization-for-collaborative-filtering-linear-to-non-linear-models-in-python-5cf54363a03c
 https://github.com/maxbrenner-ai/matrix-factorization-for-collaborative-filtering/blob/master/matrix_factorization.ipynb
 

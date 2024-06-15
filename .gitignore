@@ -1,3 +1,4 @@
 data/
 .conda/
-.venv/
+venv/
+wandb/
