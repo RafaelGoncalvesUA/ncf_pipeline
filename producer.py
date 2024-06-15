@@ -16,7 +16,7 @@ if "movielens" not in admin_client.list_topics():
     admin_client.create_topics(new_topics=[topic], validate_only=False)
 
 print("Loading data...")
-ratings = pd.read_csv("data/ratings.csv", nrows=10000)
+ratings = pd.read_csv("data/ratings_train.csv")
 ratings = ratings.to_dict(orient="records")
 print("Data loaded successfully")
 
@@ -28,11 +28,13 @@ kafka_producer_object = KafkaProducer(
 ctr = 0
 
 for rating in ratings:
-    if ctr % 1000 == 0:
+    if ctr == 0:
         should_continue = input("Continue?: ")
 
     print("Message to be send : ", rating)
     kafka_producer_object.send(KAFKA_TOPIC, rating)
 
-
     ctr += 1
+
+    if ctr % 1000 == 0:
+        time.sleep(10)
