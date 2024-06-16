@@ -112,18 +112,11 @@ def tune_nonlinear(config):
     model = NonLinearModel(num_users, num_items, config['embedding_dim'], config['dropout']).to(device)
     optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
 
-    best_eval_loss = np.inf
-    best_epoch = 0
-    
-    for epoch in range(config['num_epochs']):
+    for _ in range(config['num_epochs']):
         train_loss = train(model, train_loader, optimizer, criterion, device)
         eval_loss = evaluate(model, test_loader, criterion, device)
-
-        if eval_loss < best_eval_loss:
-            best_eval_loss = eval_loss
-            best_epoch = epoch
         
-        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss, best_eval_loss=best_eval_loss, best_epoch=best_epoch))
+        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss))
 
 search_space = {
     "embedding_dim": tune.choice([32, 64, 128, 256, 512, 1024]),
@@ -134,7 +127,7 @@ search_space = {
 
 reporter = CLIReporter(
     parameter_columns=["embedding_dim", "learning_rate", "dropout"],
-    metric_columns=["train_loss", "eval_loss", "best_eval_loss", "best_epoch"]
+    metric_columns=["train_loss", "eval_loss"]
 )
 
 scheduler = ASHAScheduler(
