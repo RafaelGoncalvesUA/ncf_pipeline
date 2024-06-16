@@ -1,3 +1,5 @@
+# KAFKA PRODUCER TO GENERATE A STREAM OF DATA
+
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka import KafkaProducer
 import json
