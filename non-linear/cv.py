@@ -114,7 +114,7 @@ def evaluate(model, dataloader, criterion, device):
             eval_loss += loss.item()
     return eval_loss / len(dataloader)
 
-K = 5
+K = 10
 
 kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 

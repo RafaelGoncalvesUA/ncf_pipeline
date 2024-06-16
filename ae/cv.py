@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset
-import torch.nn.functional as F
 from sklearn.model_selection import KFold
 from time import process_time
 from tqdm import tqdm
@@ -121,7 +120,7 @@ def evaluate(model, dataloader, criterion, device):
             eval_loss += loss.item()
     return eval_loss / len(dataloader)
 
-K = 5
+K = 10
 
 kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 
