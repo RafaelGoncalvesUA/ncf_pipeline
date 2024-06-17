@@ -1,25 +1,36 @@
-https://arxiv.org/pdf/1312.6211
+
+INTRO
+benefits of recommender systems
+what is CF
+why is continual learning needed (problem of scalability)
+we decided to focus on movie rating prediction and implement a continual learning pipeline from data processing to model deployment (from scratch, without using libraries like Kubeflow) relying on movielens. we first developed and tuned 3 models with a smaller dataset. PySpark for receiving data, Kafka for ...
+
+https://pt.d2l.ai/chapter_recommender-systems/movielens.html
+
+https://www.ibm.com/topics/collaborative-filtering
+
+SOTA
+survey techiques for CF (types of CF)
+problem of matrix factorization
+continual learning techniques (tools and frameworks, tuning, split)
+common challenges: prevent catastrophic forgetting with dropout
+papers to compare with
+
+DATASET DESCRIPTION
+(original: MovieLens 25M)
+
+distincts
+available ids min, max
+probabilidade de um user dar rating
+
+
+
+droput ref: https://arxiv.org/pdf/1312.6211
 We find that in most cases, dropout increases the opti- mal size of the net, so the resistance to forgetting may be explained mostly by the larger nets having greater capacity. However, this effect is not consistent, and when using dissimilar task pairs, dropout usually de- creases the size of the net.
 
 
 
-Dataset: MovieLens
-Kubeflow pipeline tutorial: <https://www.youtube.com/watch?v=6wWdNg0GMV4&t=2642s>
 
-
-MEMORY-BASED APPROACHES
-Weighted Average (user-user and item-item): <https://www.kaggle.com/code/iambideniz/hybrid-recommender-system/notebook>
-
-KNN (item-item) - once you have the k nearest neighbors, use their ratings for the item you want to predict a rating for: <https://www.kaggle.com/code/ecemboluk/recommendation-system-with-cf-using-knn>
-
-
-clustering
-
-
-MODEL-BASED APPROACHES
-Linear model: <https://medium.com/@maxbrenner-ai/matrix-factorization-for-collaborative-filtering-linear-to-non-linear-models-in-python-5cf54363a03c>
-
-Deep Learning: <https://keras.io/examples/structured_data/collaborative_filtering_movielens/> (more explanation: <https://www.kaggle.com/code/jamesloy/deep-learning-based-recommender-systems#Our-model---Neural-Collaborative-Filtering-(NCF)>)
 
 Rating
 
@@ -49,18 +60,29 @@ Continual Collaborative Filtering Through Gradient Alignment
 https://medium.com/@maxbrenner-ai/matrix-factorization-for-collaborative-filtering-linear-to-non-linear-models-in-python-5cf54363a03c
 https://github.com/maxbrenner-ai/matrix-factorization-for-collaborative-filtering/blob/master/matrix_factorization.ipynb
 
-https://pytorch.org/tutorials/beginner/saving_loading_models.html
 
-https://github.com/noveens/svae_cf/blob/master/main_svae.ipynb
-
-
+PAPERS WITH CODE
 
 
 
 ------------
-https://induraj2020.medium.com/recommendation-system-using-pyspark-kafka-and-spark-streaming-3eb36b3c3df0
+Dataset: MovieLens
+Kubeflow pipeline tutorial: <https://www.youtube.com/watch?v=6wWdNg0GMV4&t=2642s>
 
-Create a view: https://medium.com/conduktor/getting-started-with-pyspark-kafka-sql-and-ai-e1ac39c8e893
+
+MEMORY-BASED APPROACHES
+Weighted Average (user-user and item-item): <https://www.kaggle.com/code/iambideniz/hybrid-recommender-system/notebook>
+
+KNN (item-item) - once you have the k nearest neighbors, use their ratings for the item you want to predict a rating for: <https://www.kaggle.com/code/ecemboluk/recommendation-system-with-cf-using-knn>
+
+
+MODEL-BASED APPROACHES
+Linear model: <https://medium.com/@maxbrenner-ai/matrix-factorization-for-collaborative-filtering-linear-to-non-linear-models-in-python-5cf54363a03c>
+
+Deep Learning: <https://keras.io/examples/structured_data/collaborative_filtering_movielens/> (more explanation: <https://www.kaggle.com/code/jamesloy/deep-learning-based-recommender-systems#Our-model---Neural-Collaborative-Filtering-(NCF)>)
+
+
+https://induraj2020.medium.com/recommendation-system-using-pyspark-kafka-and-spark-streaming-3eb36b3c3df0
 
 https://spark.apache.org/docs/3.1.1/api/python/reference/api/pyspark.sql.streaming.DataStreamWriter.foreachBatch.html
 

@@ -2,3 +2,5 @@ data/
 .conda/
 venv/
 wandb/
+refs.bib
+*.tex

@@ -1,8 +1,5 @@
 torch
-kafka
-kafka-python
 pyspark
-pandas
 wandb
 tqdm
 wandb
