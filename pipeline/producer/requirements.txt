@@ -1,3 +1,4 @@
 kafka
 kafka-python
 pandas
+sklearn

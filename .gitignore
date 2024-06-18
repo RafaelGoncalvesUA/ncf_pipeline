@@ -1,6 +1,9 @@
-data/
+data/*.csv
+data/*.dat
 .conda/
 venv/
 wandb/
 refs.bib
 *.tex
+
+__pycache__/
