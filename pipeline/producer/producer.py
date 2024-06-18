@@ -38,5 +38,8 @@ for rating in ratings:
 
     ctr += 1
 
-    if ctr % 1000 == 0:
-        time.sleep(10)
+    time.sleep(0.01)
+
+    if ctr % 100000 == 0:
+        print(f"Sent {ctr} messages")
+        time.sleep(5)
