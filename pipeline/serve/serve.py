@@ -1,4 +1,4 @@
-# SERVING THE DL MODEL USING A FLASK API
+# SERVING THE NCF MODEL USING A FLASK API
 
 import torch
 from flask import Flask, request, jsonify
