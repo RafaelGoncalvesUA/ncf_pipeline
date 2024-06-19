@@ -82,7 +82,8 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat,y) + self.eps)
         return loss
     
-criterion = RMSELoss()
+criterion = nn.MSELoss()
+metric = RMSELoss()
 
 def train(model, dataloader, optimizer, criterion, device):
     model.train()
@@ -97,16 +98,17 @@ def train(model, dataloader, optimizer, criterion, device):
         train_loss += loss.item()
     return train_loss / len(dataloader)
 
-def evaluate(model, dataloader, criterion, device):
+def evaluate(model, dataloader, criterion, metric, device):
     model.eval()
     eval_loss = 0
+    eval_metric = 0
     with torch.no_grad():
         for user_ids, item_ids, ratings in tqdm(dataloader, desc="Evaluating"):
             user_ids, item_ids, ratings = user_ids.to(device), item_ids.to(device), ratings.to(device).float()
             outputs = model(user_ids, item_ids)
-            loss = criterion(outputs, ratings)
-            eval_loss += loss.item()
-    return eval_loss / len(dataloader)
+            eval_loss += criterion(outputs, ratings).item()
+            eval_metric += metric(outputs, ratings).item()
+    return eval_loss / len(dataloader), eval_metric / len(dataloader)
 
 def tune_nonlinear(config):
     model = NonLinearModel(num_users, num_items, config['embedding_dim'], config['dropout']).to(device)
@@ -114,9 +116,9 @@ def tune_nonlinear(config):
 
     for _ in range(config['num_epochs']):
         train_loss = train(model, train_loader, optimizer, criterion, device)
-        eval_loss = evaluate(model, test_loader, criterion, device)
+        eval_loss, eval_metric = evaluate(model, test_loader, criterion, metric, device)
         
-        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss))
+        ray.train.report(dict(train_loss=train_loss, eval_loss=eval_loss, eval_metric=eval_metric))
 
 search_space = {
     "embedding_dim": tune.choice([32, 64, 128, 256, 512, 1024]),
@@ -127,11 +129,11 @@ search_space = {
 
 reporter = CLIReporter(
     parameter_columns=["embedding_dim", "learning_rate", "dropout"],
-    metric_columns=["train_loss", "eval_loss"]
+    metric_columns=["train_loss", "eval_loss", "eval_metric"],
 )
 
 scheduler = ASHAScheduler(
-    metric="eval_loss",
+    metric="eval_metric",
     mode="min",
     max_t=10,
     grace_period=1,

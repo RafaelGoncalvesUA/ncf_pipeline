@@ -9,7 +9,7 @@ from sklearn.model_selection import KFold
 from time import process_time
 from tqdm import tqdm
 
-ray_results = pd.read_csv('vae/ray_results/ray_tune_results.csv').sort_values('eval_loss', ascending=True)
+ray_results = pd.read_csv('models/vae/ray_results/ray_tune_results.csv').sort_values('eval_loss', ascending=True)
 
 idx = 0
 
@@ -165,9 +165,9 @@ class RMSELoss(nn.Module):
         return loss
     
 def vae_loss(reconstructed_ratings, true_ratings, mu, log_var, beta):
-    rsme_loss = RMSELoss()(reconstructed_ratings, true_ratings)
+    mse_loss = nn.MSELoss()(reconstructed_ratings, true_ratings)
     kld_loss = -0.5 * torch.mean(torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1))
-    return rsme_loss + beta * kld_loss
+    return mse_loss + beta * kld_loss
 
 criterion = vae_loss
 metric = RMSELoss()
