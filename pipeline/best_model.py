@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from tqdm import tqdm
 import wandb
 
-wandb.login(key="1bf6d96598e920a3fe32392d71154f5e9011cdbd", relogin=True)
-wandb.init(project="proj-caa-2")
+# wandb.login(key="1bf6d96598e920a3fe32392d71154f5e9011cdbd", relogin=True)
+# wandb.init(project="proj-caa-2")
 
 
 class MovieLensDataset(Dataset):
@@ -84,12 +84,12 @@ class NonLinearModel(nn.Module):
         for epoch in range(num_epochs):
             train_loss = self.train_(train_loader, device)
             eval_loss = self.evaluate(val_loader, device)
-            wandb.log({"train_loss": train_loss, "eval_loss": eval_loss})
+            #wandb.log({"train_loss": train_loss, "eval_loss": eval_loss})
             print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
 
         test_loss = self.evaluate(test_loader, device)
         print(f"Test Loss: {test_loss:.4f}")
-        wandb.log({"test_loss": test_loss})
+        #wandb.log({"test_loss": test_loss})
 
     def predict(self, user_id, item_id, device):
         self.eval()
@@ -99,5 +99,5 @@ class NonLinearModel(nn.Module):
             rating = self(user_tensor, item_tensor)
             return rating.item()
 
-    def log(self, message):
-        wandb.log(message)
+    # def log(self, message):
+    #     #wandb.log(message)
