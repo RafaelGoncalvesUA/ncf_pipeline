@@ -26,17 +26,6 @@ class MovieLensDataset(Dataset):
         return (self.users[idx], self.items[idx], self.ratings[idx])
 
 
-class RMSELoss(nn.Module):
-    def __init__(self, eps=1e-6):
-        super().__init__()
-        self.mse = nn.MSELoss()
-        self.eps = eps
-        
-    def forward(self,yhat,y):
-        loss = torch.sqrt(self.mse(yhat,y) + self.eps)
-        return loss
-
-
 class NonLinearModel(nn.Module):
     def __init__(self, num_users, num_items, embedding_dim, dropout):
         super(NonLinearModel, self).__init__()
@@ -50,7 +39,7 @@ class NonLinearModel(nn.Module):
         self.fc3 = nn.Linear(64, 1)
 
         self.optim = optim.Adam(self.parameters(), lr=0.0010887937927239) # best value
-        self.criterion = RMSELoss()
+        self.criterion = nn.MSELoss()
 
     def forward(self, user_ids, item_ids):
         user_embeds = self.user_embedding(user_ids)
@@ -63,14 +52,14 @@ class NonLinearModel(nn.Module):
         x = self.fc3(x)
         return x.squeeze()
     
-    def train_(self, dataloader, criterion, device):
+    def train_(self, dataloader, device):
         self.train()
         train_loss = 0
         for user_ids, item_ids, ratings in dataloader:
             user_ids, item_ids, ratings = user_ids.to(device), item_ids.to(device), ratings.to(device).float()
             self.optim.zero_grad()
             outputs = self(user_ids, item_ids)
-            loss = criterion(outputs, ratings)
+            loss = self.criterion(outputs, ratings)
             loss.backward()
             self.optim.step()
             train_loss += loss.item()
@@ -87,11 +76,20 @@ class NonLinearModel(nn.Module):
                 eval_loss += loss.item()
         return eval_loss / len(dataloader)
 
-    def fit(self, train_loader, test_loader, device, num_epochs):
+    def fit(self, train_loader, val_loader, test_loader, num_epochs):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.to(device)
+        print(f"Training on {device}")
+
         for epoch in range(num_epochs):
             train_loss = self.train_(train_loader, device)
-            eval_loss = self.evaluate(test_loader, device)
+            eval_loss = self.evaluate(val_loader, device)
+            wandb.log({"train_loss": train_loss, "eval_loss": eval_loss})
             print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
+
+        test_loss = self.evaluate(test_loader, device)
+        print(f"Test Loss: {test_loss:.4f}")
+        wandb.log({"test_loss": test_loss})
 
     def predict(self, user_id, item_id, device):
         self.eval()
@@ -100,3 +98,6 @@ class NonLinearModel(nn.Module):
             item_tensor = torch.tensor([item_id]).to(device)
             rating = self(user_tensor, item_tensor)
             return rating.item()
+
+    def log(self, message):
+        wandb.log(message)
