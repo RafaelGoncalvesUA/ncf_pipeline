@@ -8,7 +8,7 @@ from sklearn.model_selection import KFold
 from time import process_time
 from tqdm import tqdm
 
-ray_results = pd.read_csv('non-linear/ray_results/ray_tune_results.csv').sort_values('eval_loss', ascending=True)
+ray_results = pd.read_csv('models/non-linear/ray_results/ray_tune_results.csv').sort_values('eval_loss', ascending=True)
 
 idx = 0
 
@@ -88,7 +88,8 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat,y) + self.eps)
         return loss
     
-criterion = RMSELoss()
+criterion = nn.MSELoss()
+metric = RMSELoss()
 
 def train(model, dataloader, optimizer, criterion, device):
     model.train()
@@ -103,16 +104,17 @@ def train(model, dataloader, optimizer, criterion, device):
         train_loss += loss.item()
     return train_loss / len(dataloader)
 
-def evaluate(model, dataloader, criterion, device):
+def evaluate(model, dataloader, criterion, metric, device):
     model.eval()
     eval_loss = 0
+    eval_metric = 0
     with torch.no_grad():
         for user_ids, item_ids, ratings in tqdm(dataloader, desc="Evaluating"):
             user_ids, item_ids, ratings = user_ids.to(device), item_ids.to(device), ratings.to(device).float()
             outputs = model(user_ids, item_ids)
-            loss = criterion(outputs, ratings)
-            eval_loss += loss.item()
-    return eval_loss / len(dataloader)
+            eval_loss += criterion(outputs, ratings).item()
+            eval_metric += metric(outputs, ratings).item()
+    return eval_loss / len(dataloader), eval_metric / len(dataloader)
 
 K = 10
 
@@ -120,6 +122,8 @@ kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 
 train_losses = []
 eval_losses = []
+eval_metrics = []
+
 times = []
 
 for fold, (train_idx, eval_idx) in enumerate(kfold.split(dataset)):
@@ -129,6 +133,7 @@ for fold, (train_idx, eval_idx) in enumerate(kfold.split(dataset)):
 
     fold_train_losses = []
     fold_eval_losses = []
+    fold_eval_metrics = []
     
     train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
     eval_subsampler = torch.utils.data.SubsetRandomSampler(eval_idx)
@@ -142,22 +147,24 @@ for fold, (train_idx, eval_idx) in enumerate(kfold.split(dataset)):
 
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, optimizer, criterion, device)
-        eval_loss = evaluate(model, eval_loader, criterion, device)
+        eval_loss, eval_metric = evaluate(model, eval_loader, criterion, metric, device)
 
         fold_train_losses.append(train_loss)
         fold_eval_losses.append(eval_loss)
+        fold_eval_metrics.append(eval_metric)
 
-        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
+        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}, Eval Metric: {eval_metric:.4f}")
     
     train_losses.append(fold_train_losses)
     eval_losses.append(fold_eval_losses)
+    eval_metrics.append(fold_eval_metrics)
 
     times.append(process_time() - gtime)
 
 results = []
 
-for fold, (train_losses_fold, eval_losses_fold, time) in enumerate(zip(train_losses, eval_losses, times)):
-    for epoch, (train_loss, eval_loss) in enumerate(zip(train_losses_fold, eval_losses_fold)):
+for fold, (train_losses_fold, eval_losses_fold, eval_metrics_fold, time) in enumerate(zip(train_losses, eval_losses, eval_metrics, times)):
+    for epoch, (train_loss, eval_loss, eval_metric) in enumerate(zip(train_losses_fold, eval_losses_fold, eval_metrics_fold)):
         results.append({
             'config/embedding_dim': embedding_dim,
             'config/dropout': dropout,
@@ -167,6 +174,7 @@ for fold, (train_losses_fold, eval_losses_fold, time) in enumerate(zip(train_los
             'epoch': epoch,
             'train_loss': train_loss,
             'eval_loss': eval_loss,
+            'eval_metric': eval_metric,
             'elapsed_time': time,
             'num_users': num_users,
             'num_items': num_items,

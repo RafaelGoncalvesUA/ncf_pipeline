@@ -95,7 +95,8 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat,y) + self.eps)
         return loss
     
-criterion = RMSELoss()
+criterion = nn.MSELoss()
+metric = RMSELoss()
 
 def train(model, dataloader, optimizer, criterion, device):
     model.train()
@@ -110,21 +111,22 @@ def train(model, dataloader, optimizer, criterion, device):
         train_loss += loss.item()
     return train_loss / len(dataloader)
 
-def evaluate(model, dataloader, criterion, device):
+def evaluate(model, dataloader, criterion, metric, device):
     model.eval()
     eval_loss = 0
+    eval_metric = 0
     with torch.no_grad():
         for user_ids, item_ids, ratings in tqdm(dataloader, desc="Evaluating"):
             user_ids, item_ids, ratings = user_ids.to(device), item_ids.to(device), ratings.to(device).float()
             outputs = model(user_ids, item_ids)
-            loss = criterion(outputs, ratings)
-            eval_loss += loss.item()
-    return eval_loss / len(dataloader)
+            eval_loss += criterion(outputs, ratings).item()
+            eval_metric += metric(outputs, ratings).item()
+    return eval_loss / len(dataloader), eval_metric / len(dataloader)
 
 for epoch in range(num_epochs):
     train_loss = train(model, train_loader, optimizer, criterion, device)
-    eval_loss = evaluate(model, test_loader, criterion, device)
-    print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}")
+    eval_loss, eval_metric = evaluate(model, test_loader, criterion, metric, device)
+    print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Eval Loss: {eval_loss:.4f}, Eval Metric: {eval_metric:.4f}")
 
 def predict(model, user_id, item_id, device):
     model.eval()
