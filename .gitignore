@@ -1,9 +1,10 @@
 data/*.csv
 data/*.dat
+*.pth
+*.pkl
 .conda/
 venv/
 wandb/
 refs.bib
 *.tex
-
 __pycache__/

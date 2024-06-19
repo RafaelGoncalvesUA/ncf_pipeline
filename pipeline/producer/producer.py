@@ -18,7 +18,7 @@ if "movielens" not in admin_client.list_topics():
     admin_client.create_topics(new_topics=[topic], validate_only=False)
 
 print("Loading data...")
-ratings = pd.read_csv("data/ratings_train.csv")
+ratings = pd.read_csv("../../data/ratings_batches.csv")
 ratings = ratings.to_dict(orient="records")
 print("Data loaded successfully")
 
@@ -38,8 +38,8 @@ for rating in ratings:
 
     ctr += 1
 
-    time.sleep(0.01)
+    time.sleep(0.0001)
 
     if ctr % 100000 == 0:
         print(f"Sent {ctr} messages")
-        time.sleep(5)
+        time.sleep(300)
