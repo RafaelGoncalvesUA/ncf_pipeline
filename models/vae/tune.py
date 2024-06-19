@@ -75,6 +75,18 @@ class VAE(nn.Module):
             nn.Linear(hidden_dim, 1)
         )
 
+        self._initialize_weights()
+
+
+    def _initialize_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Embedding):
+                nn.init.normal_(module.weight, mean=0, std=0.01)
+            elif isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
     def encode(self, user_vec, item_vec):
         combined_vec = torch.cat([user_vec, item_vec], dim=1)
         hidden = self.encoder(combined_vec)
